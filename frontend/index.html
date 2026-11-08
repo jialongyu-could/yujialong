@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>网卡限速</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;display:flex;min-height:100vh;background:#0b1220;color:#e5e7eb;font:14px system-ui,sans-serif}
+    aside{width:220px;padding:22px 14px;background:#080d18;border-right:1px solid #253044}aside h2{color:#38bdf8;font-size:18px;padding:0 10px}aside div{padding:12px 10px;margin-top:8px;border-radius:8px;background:#122033}
+    main{flex:1;padding:24px;min-width:0}h1{margin-top:0}.panel{background:#111b2b;border:1px solid #253044;border-radius:10px;padding:16px;margin:16px 0;overflow:auto}
+    table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #253044}th{color:#9ca3af}
+    input,select,button{padding:9px;border-radius:6px;border:1px solid #34445c;background:#0b1220;color:#e5e7eb}button{cursor:pointer;background:#0284c7;border:0;font-weight:600}.danger{background:#b91c1c}
+    .form{display:flex;flex-wrap:wrap;gap:10px;align-items:end}.form label{display:grid;gap:5px}.form input,.form select{min-width:125px}.muted{color:#9ca3af;font-size:12px}.token{width:min(440px,100%)}#message{white-space:pre-wrap;color:#fbbf24}
+    @media(max-width:700px){aside{width:140px}main{padding:14px}}
+  </style>
+</head>
+<body>
+  <aside><h2>网卡限速</h2><div>网卡实时流量</div><div>限速规则</div></aside>
+  <main>
+    <h1>网卡限速</h1>
+    <section class="panel">
+      <label>访问令牌：<input id="token" class="token" type="password" autocomplete="current-password"></label>
+      <button id="saveToken">保存令牌</button> <button id="refresh">刷新</button>
+      <p class="muted">每 2 秒刷新；令牌仅保存在当前浏览器会话。</p><div id="message"></div>
+    </section>
+    <section class="panel"><h3 id="node">节点：-</h3>
+      <table><thead><tr><th>网卡</th><th>下载实时流量</th><th>上传实时流量</th><th>下载限速</th><th>上传限速</th></tr></thead><tbody id="interfaces"></tbody></table>
+    </section>
+    <section class="panel"><h3>添加规则</h3><div class="form">
+      <label>网卡<select id="iface"></select></label>
+      <label>方向<select id="direction"><option value="tx">上传</option><option value="rx">下载</option></select></label>
+      <label>速率 Mbps<input id="rate" type="number" min="1" value="100"></label>
+      <label>开始<input id="start" type="time" value="09:00"></label><label>结束<input id="end" type="time" value="18:00"></label>
+      <label>星期<select id="days" multiple size="2" title="可多选，周一到周日">
+        <option value="0" selected>周一</option><option value="1" selected>周二</option><option value="2" selected>周三</option><option value="3" selected>周四</option><option value="4" selected>周五</option><option value="5" selected>周六</option><option value="6" selected>周日</option>
+      </select></label><button id="add">添加规则</button>
+    </div><p class="muted">支持跨午夜时段，例如 23:00–02:00。下载限速采用 policing，超额流量会丢弃。</p></section>
+    <section class="panel"><h3>规则列表</h3>
+      <table><thead><tr><th>网卡</th><th>方向</th><th>速率</th><th>星期</th><th>时间</th><th>操作</th></tr></thead><tbody id="rules"></tbody></table>
+    </section>
+  </main>
+<script>
+  const tokenInput=document.querySelector('#token');tokenInput.value=sessionStorage.getItem('pveNicShaperToken')||'';
+  async function api(path,options={}){const headers=new Headers(options.headers||{});headers.set('Authorization','Bearer '+tokenInput.value.trim());if(options.body)headers.set('Content-Type','application/json');const response=await fetch(path,{...options,headers});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||`HTTP ${response.status}`);return body;}
+  function cell(row,text){const td=document.createElement('td');td.textContent=text;row.appendChild(td)}
+  function message(text){document.querySelector('#message').textContent=text||''}
+  async function refresh(){try{
+    const [status,rules]=await Promise.all([api('/api/status'),api('/api/rules')]);document.querySelector('#node').textContent=`节点：${status.node}`;
+    const body=document.querySelector('#interfaces');body.replaceChildren();status.interfaces.forEach(item=>{const tr=document.createElement('tr');cell(tr,item.iface);cell(tr,`${item.rx_mbps.toFixed(3)} Mbps`);cell(tr,`${item.tx_mbps.toFixed(3)} Mbps`);cell(tr,item.rx_limit_mbps==null?'未限速':`${item.rx_limit_mbps} Mbps`);cell(tr,item.tx_limit_mbps==null?'未限速':`${item.tx_limit_mbps} Mbps`);body.appendChild(tr)});
+    const select=document.querySelector('#iface'),selected=select.value;select.replaceChildren();status.interfaces.forEach(item=>{const option=document.createElement('option');option.value=item.iface;option.textContent=item.iface;select.appendChild(option)});if([...select.options].some(o=>o.value===selected))select.value=selected;
+    const ruleBody=document.querySelector('#rules');ruleBody.replaceChildren();rules.forEach(rule=>{const tr=document.createElement('tr');cell(tr,rule.iface);cell(tr,rule.direction==='tx'?'上传':'下载');cell(tr,`${rule.rate_mbps} Mbps`);cell(tr,rule.days.split(',').map(d=>'一二三四五六日'[Number(d)]).join('、'));cell(tr,`${rule.start_hhmm}–${rule.end_hhmm}`);const td=document.createElement('td'),button=document.createElement('button');button.className='danger';button.textContent='删除';button.addEventListener('click',async()=>{try{const result=await api(`/api/rules/${rule.id}`,{method:'DELETE'});message(result.errors?.join('\n')||'规则已删除');await refresh()}catch(error){message(error.message)}});td.appendChild(button);tr.appendChild(td);ruleBody.appendChild(tr)});
+    message(status.errors?.join('\n')||'');
+  }catch(error){message(error.message)}}
+  document.querySelector('#saveToken').addEventListener('click',()=>{sessionStorage.setItem('pveNicShaperToken',tokenInput.value.trim());message('令牌已保存在当前浏览器会话');refresh()});
+  document.querySelector('#refresh').addEventListener('click',refresh);
+  document.querySelector('#add').addEventListener('click',async()=>{const days=[...document.querySelector('#days').selectedOptions].map(o=>Number(o.value));try{const result=await api('/api/rules',{method:'POST',body:JSON.stringify({iface:document.querySelector('#iface').value,direction:document.querySelector('#direction').value,rate_mbps:Number(document.querySelector('#rate').value),start_hhmm:document.querySelector('#start').value,end_hhmm:document.querySelector('#end').value,days,enabled:true})});message(result.errors?.join('\n')||'规则已保存');await refresh()}catch(error){message(error.message)}});
+  refresh();setInterval(refresh,2000);
+</script>
+</body>
+</html>

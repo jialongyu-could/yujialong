@@ -1,0 +1,23 @@
+[Unit]
+Description=PVE NIC Shaper local agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/pve-nic-shaper
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/pve-nic-shaper/backend/app.py
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/pve-nic-shaper
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+
+[Install]
+WantedBy=multi-user.target
