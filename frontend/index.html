@@ -3,58 +3,145 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>网卡限速</title>
+  <title>PVE 网卡限速</title>
   <style>
-    *{box-sizing:border-box}body{margin:0;display:flex;min-height:100vh;background:#0b1220;color:#e5e7eb;font:14px system-ui,sans-serif}
-    aside{width:220px;padding:22px 14px;background:#080d18;border-right:1px solid #253044}aside h2{color:#38bdf8;font-size:18px;padding:0 10px}aside div{padding:12px 10px;margin-top:8px;border-radius:8px;background:#122033}
-    main{flex:1;padding:24px;min-width:0}h1{margin-top:0}.panel{background:#111b2b;border:1px solid #253044;border-radius:10px;padding:16px;margin:16px 0;overflow:auto}
-    table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #253044}th{color:#9ca3af}
-    input,select,button{padding:9px;border-radius:6px;border:1px solid #34445c;background:#0b1220;color:#e5e7eb}button{cursor:pointer;background:#0284c7;border:0;font-weight:600}.danger{background:#b91c1c}
-    .form{display:flex;flex-wrap:wrap;gap:10px;align-items:end}.form label{display:grid;gap:5px}.form input,.form select{min-width:125px}.muted{color:#9ca3af;font-size:12px}.token{width:min(440px,100%)}#message{white-space:pre-wrap;color:#fbbf24}
-    @media(max-width:700px){aside{width:140px}main{padding:14px}}
+    :root{font:14px system-ui,-apple-system,"Segoe UI",sans-serif;color:#142d49;background:#f1f5f9}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh}header{height:64px;background:#fff;border-bottom:1px solid #dce5ef;display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100vw - 1200px)/2));position:sticky;top:0;z-index:1}
+    .brand{font-weight:750;letter-spacing:.08em;color:#1676b8}.brand span{color:#536b83;font-size:12px;margin-left:8px}
+    main{max-width:1200px;margin:0 auto;padding:30px 24px}h1{font-size:28px;margin:4px 0 8px}h2{font-size:18px;margin:0}h3{font-size:15px;margin:0 0 14px}.sub{color:#60758c;margin:0 0 24px}.card{background:#fff;border:1px solid #dce5ef;border-radius:9px;padding:20px;margin:18px 0;box-shadow:0 2px 6px #173a5910}
+    .summary{display:flex;align-items:center;gap:28px;flex-wrap:wrap}.state{display:flex;align-items:center;gap:12px;min-width:220px}.state strong{display:block;font-size:17px}.state small,.muted{display:block;color:#6b8198;font-size:12px;margin-top:5px}.summary-meta{border-left:1px solid #dce5ef;padding-left:28px;color:#6b8198;font-size:12px}.summary-meta b{display:block;color:#173653;font-size:15px;margin-top:5px}.right{margin-left:auto}
+    button,input,select{font:inherit;border:1px solid #cbd7e3;border-radius:6px;padding:9px 11px;background:#fff;color:#173653}button{cursor:pointer;background:#167bb7;border-color:#167bb7;color:#fff;font-weight:650}button.secondary{color:#173653;background:#fff;border-color:#cbd7e3}button.danger{background:#b93232;border-color:#b93232}.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.form{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.form label,.filters label{display:grid;gap:5px;color:#536b83;font-size:12px}.form input,.form select{min-width:120px}.form select[multiple]{height:60px}.notice{color:#637b93;font-size:12px;margin-bottom:0}
+    table{width:100%;border-collapse:collapse;min-width:620px}th,td{text-align:left;padding:11px 9px;border-bottom:1px solid #e5ebf1}th{font-size:12px;color:#657b91;background:#f7f9fb}td{color:#26435e}.table-wrap{overflow:auto}.empty{text-align:center;color:#71859a;padding:25px}
+    .filters{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin:15px 0}.filters input,.filters select{min-width:145px}.metric{font-size:23px;font-weight:700;color:#173653}.metric small{font-size:13px;font-weight:500;color:#60758c}.events{list-style:none;padding:0;margin:0}.events li{display:flex;gap:14px;padding:10px 0;border-bottom:1px solid #e5ebf1}.events li:last-child{border:0}.event-time{color:#72869a;white-space:nowrap;font-size:12px}.event-error{color:#b93232}.token{width:min(360px,100%)}#message{min-height:18px;color:#9a6700;white-space:pre-wrap;margin:8px 0 0}.badge{display:inline-block;padding:5px 9px;border-radius:5px;background:#e4f3ec;color:#176d52;font-weight:700}.badge.off{background:#fff0e8;color:#a8491e}
+    @media(max-width:650px){header{padding:0 16px}main{padding:22px 14px}h1{font-size:24px}.summary-meta{border-left:0;padding:0}.state{min-width:auto}}
   </style>
 </head>
 <body>
-  <aside><h2>网卡限速</h2><div>网卡实时流量</div><div>限速规则</div></aside>
+  <header><div class="brand">PVE <span>RATE MANAGER</span></div><div id="serviceBadge" class="badge">正在连接</div></header>
   <main>
-    <h1>网卡限速</h1>
-    <section class="panel">
-      <label>访问令牌：<input id="token" class="token" type="password" autocomplete="current-password"></label>
-      <button id="saveToken">保存令牌</button> <button id="refresh">刷新</button>
-      <p class="muted">每 2 秒刷新；令牌仅保存在当前浏览器会话。</p><div id="message"></div>
+    <h1>网卡定时限速</h1>
+    <p class="sub">节点 <strong id="node">-</strong> · 本地轻量调度，每 2 秒采样一次网卡流量。</p>
+    <section class="card summary">
+      <div class="state"><div><strong id="serviceState">读取状态中</strong><small>暂停后将解除本工具管理的限速规则</small></div><button id="toggleService">暂停调度</button></div>
+      <div class="summary-meta">本机时间<b id="localTime">-</b></div>
+      <div class="summary-meta">网卡规则<b id="ruleCount">0 条规则</b></div>
+      <div class="summary-meta right">访问令牌<input id="token" class="token" type="password" autocomplete="current-password"></div>
+      <div class="toolbar right"><button id="saveToken" class="secondary">保存令牌</button><button id="refresh" class="secondary">刷新状态</button></div>
+      <p class="muted" style="width:100%;margin:0">令牌仅保存在当前浏览器会话。远程访问请通过 SSH 隧道连接。</p>
+      <div id="message" style="width:100%"></div>
     </section>
-    <section class="panel"><h3 id="node">节点：-</h3>
+
+    <section class="card"><h3>网卡实时流量</h3><div class="table-wrap">
       <table><thead><tr><th>网卡</th><th>下载实时流量</th><th>上传实时流量</th><th>下载限速</th><th>上传限速</th></tr></thead><tbody id="interfaces"></tbody></table>
-    </section>
-    <section class="panel"><h3>添加规则</h3><div class="form">
+    </div></section>
+
+    <section class="card"><h3>添加网卡规则</h3><div class="form">
       <label>网卡<select id="iface"></select></label>
       <label>方向<select id="direction"><option value="tx">上传</option><option value="rx">下载</option></select></label>
-      <label>速率 Mbps<input id="rate" type="number" min="1" value="100"></label>
+      <label>速率 Mbps<input id="rate" type="number" min="1" max="100000" value="100"></label>
       <label>开始<input id="start" type="time" value="09:00"></label><label>结束<input id="end" type="time" value="18:00"></label>
       <label>星期<select id="days" multiple size="2" title="可多选，周一到周日">
         <option value="0" selected>周一</option><option value="1" selected>周二</option><option value="2" selected>周三</option><option value="3" selected>周四</option><option value="4" selected>周五</option><option value="5" selected>周六</option><option value="6" selected>周日</option>
       </select></label><button id="add">添加规则</button>
-    </div><p class="muted">支持跨午夜时段，例如 23:00–02:00。下载限速采用 policing，超额流量会丢弃。</p></section>
-    <section class="panel"><h3>规则列表</h3>
+    </div><p class="notice">支持跨午夜时段；同一网卡、方向同时命中多条规则时取较低速率。下载限速使用 policing，超额流量会丢弃。</p></section>
+
+    <section class="card"><h3>网卡规则</h3><div class="table-wrap">
       <table><thead><tr><th>网卡</th><th>方向</th><th>速率</th><th>星期</th><th>时间</th><th>操作</th></tr></thead><tbody id="rules"></tbody></table>
+    </div></section>
+
+    <section class="card"><div class="toolbar"><h3>每日上行流量</h3><button id="export" class="secondary right">导出 CSV</button></div>
+      <div class="filters"><label>日期<input id="statsDate" type="date"></label><label>网卡<select id="statsIface"><option value="">全部网卡</option></select></label><div><span class="muted">所选日期上行</span><div id="totalUpload" class="metric">0.000 <small>GB</small></div></div></div>
+      <div class="table-wrap"><table><thead><tr><th>日期 / 网卡</th><th>总上行</th><th>采样说明</th></tr></thead><tbody id="stats"></tbody></table></div>
+      <p class="notice">上行字节来自系统网卡计数器；服务运行期间每分钟批量保存一次，以减少磁盘写入。</p>
     </section>
+
+    <section class="card"><div class="toolbar"><h3>执行记录</h3><span class="muted right">最多保留最近 40 条</span></div><ul id="events" class="events"></ul></section>
   </main>
 <script>
-  const tokenInput=document.querySelector('#token');tokenInput.value=sessionStorage.getItem('pveNicShaperToken')||'';
-  async function api(path,options={}){const headers=new Headers(options.headers||{});headers.set('Authorization','Bearer '+tokenInput.value.trim());if(options.body)headers.set('Content-Type','application/json');const response=await fetch(path,{...options,headers});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||`HTTP ${response.status}`);return body;}
+  const tokenInput=document.querySelector('#token');
+  tokenInput.value=sessionStorage.getItem('pveNicShaperToken')||'';
+  let serviceEnabled=true;
+  const dayNames=['一','二','三','四','五','六','日'];
+  async function api(path,options={}){
+    const headers=new Headers(options.headers||{});
+    headers.set('Authorization','Bearer '+tokenInput.value.trim());
+    if(options.body)headers.set('Content-Type','application/json');
+    const response=await fetch(path,{...options,headers});
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(body.error||`HTTP ${response.status}`);
+    return body;
+  }
   function cell(row,text){const td=document.createElement('td');td.textContent=text;row.appendChild(td)}
   function message(text){document.querySelector('#message').textContent=text||''}
-  async function refresh(){try{
-    const [status,rules]=await Promise.all([api('/api/status'),api('/api/rules')]);document.querySelector('#node').textContent=`节点：${status.node}`;
-    const body=document.querySelector('#interfaces');body.replaceChildren();status.interfaces.forEach(item=>{const tr=document.createElement('tr');cell(tr,item.iface);cell(tr,`${item.rx_mbps.toFixed(3)} Mbps`);cell(tr,`${item.tx_mbps.toFixed(3)} Mbps`);cell(tr,item.rx_limit_mbps==null?'未限速':`${item.rx_limit_mbps} Mbps`);cell(tr,item.tx_limit_mbps==null?'未限速':`${item.tx_limit_mbps} Mbps`);body.appendChild(tr)});
-    const select=document.querySelector('#iface'),selected=select.value;select.replaceChildren();status.interfaces.forEach(item=>{const option=document.createElement('option');option.value=item.iface;option.textContent=item.iface;select.appendChild(option)});if([...select.options].some(o=>o.value===selected))select.value=selected;
-    const ruleBody=document.querySelector('#rules');ruleBody.replaceChildren();rules.forEach(rule=>{const tr=document.createElement('tr');cell(tr,rule.iface);cell(tr,rule.direction==='tx'?'上传':'下载');cell(tr,`${rule.rate_mbps} Mbps`);cell(tr,rule.days.split(',').map(d=>'一二三四五六日'[Number(d)]).join('、'));cell(tr,`${rule.start_hhmm}–${rule.end_hhmm}`);const td=document.createElement('td'),button=document.createElement('button');button.className='danger';button.textContent='删除';button.addEventListener('click',async()=>{try{const result=await api(`/api/rules/${rule.id}`,{method:'DELETE'});message(result.errors?.join('\n')||'规则已删除');await refresh()}catch(error){message(error.message)}});td.appendChild(button);tr.appendChild(td);ruleBody.appendChild(tr)});
-    message(status.errors?.join('\n')||'');
-  }catch(error){message(error.message)}}
-  document.querySelector('#saveToken').addEventListener('click',()=>{sessionStorage.setItem('pveNicShaperToken',tokenInput.value.trim());message('令牌已保存在当前浏览器会话');refresh()});
-  document.querySelector('#refresh').addEventListener('click',refresh);
-  document.querySelector('#add').addEventListener('click',async()=>{const days=[...document.querySelector('#days').selectedOptions].map(o=>Number(o.value));try{const result=await api('/api/rules',{method:'POST',body:JSON.stringify({iface:document.querySelector('#iface').value,direction:document.querySelector('#direction').value,rate_mbps:Number(document.querySelector('#rate').value),start_hhmm:document.querySelector('#start').value,end_hhmm:document.querySelector('#end').value,days,enabled:true})});message(result.errors?.join('\n')||'规则已保存');await refresh()}catch(error){message(error.message)}});
-  refresh();setInterval(refresh,2000);
+  function selectedDate(){return document.querySelector('#statsDate').value}
+  async function refresh(){
+    try{
+      const [status,rules]=await Promise.all([api('/api/status'),api('/api/rules')]);
+      serviceEnabled=status.enabled;
+      document.querySelector('#node').textContent=status.node;
+      document.querySelector('#serviceState').textContent=serviceEnabled?'自动调度已开启':'自动调度已暂停';
+      document.querySelector('#serviceBadge').textContent=serviceEnabled?'程序运行中':'调度已暂停';
+      document.querySelector('#serviceBadge').classList.toggle('off',!serviceEnabled);
+      document.querySelector('#toggleService').textContent=serviceEnabled?'暂停调度':'开启调度';
+      document.querySelector('#ruleCount').textContent=`${rules.length} 条规则`;
+      const body=document.querySelector('#interfaces');body.replaceChildren();
+      status.interfaces.forEach(item=>{
+        const tr=document.createElement('tr');cell(tr,item.iface);cell(tr,`${item.rx_mbps.toFixed(3)} Mbps`);cell(tr,`${item.tx_mbps.toFixed(3)} Mbps`);
+        cell(tr,item.rx_limit_mbps==null?'未限速':`${item.rx_limit_mbps} Mbps`);cell(tr,item.tx_limit_mbps==null?'未限速':`${item.tx_limit_mbps} Mbps`);body.appendChild(tr);
+      });
+      const select=document.querySelector('#iface'),selected=select.value;select.replaceChildren();
+      status.interfaces.forEach(item=>{const option=document.createElement('option');option.value=item.iface;option.textContent=item.iface;select.appendChild(option)});
+      if([...select.options].some(option=>option.value===selected))select.value=selected;
+      const statsSelect=document.querySelector('#statsIface'),statsSelected=statsSelect.value;statsSelect.replaceChildren(new Option('全部网卡',''));
+      status.interfaces.forEach(item=>statsSelect.add(new Option(item.iface,item.iface)));
+      if([...statsSelect.options].some(option=>option.value===statsSelected))statsSelect.value=statsSelected;
+      renderRules(rules);
+      if(status.errors?.length)message(status.errors.join('\n'));
+    }catch(error){message(error.message)}
+  }
+  function renderRules(rules){
+    const ruleBody=document.querySelector('#rules');ruleBody.replaceChildren();
+    if(!rules.length){const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=6;td.className='empty';td.textContent='暂无规则';tr.appendChild(td);ruleBody.appendChild(tr);return}
+    rules.forEach(rule=>{
+      const tr=document.createElement('tr');cell(tr,rule.iface);cell(tr,rule.direction==='tx'?'上传':'下载');cell(tr,`${rule.rate_mbps} Mbps`);
+      cell(tr,rule.days.split(',').map(day=>`周${dayNames[Number(day)]}`).join('、'));cell(tr,`${rule.start_hhmm}–${rule.end_hhmm}`);
+      const td=document.createElement('td'),button=document.createElement('button');button.className='danger';button.textContent='删除';
+      button.addEventListener('click',async()=>{try{const result=await api(`/api/rules/${rule.id}`,{method:'DELETE'});message(result.errors?.join('\n')||'规则已删除');await refresh();await refreshActivity()}catch(error){message(error.message)}});
+      td.appendChild(button);tr.appendChild(td);ruleBody.appendChild(tr);
+    });
+  }
+  async function refreshActivity(){
+    try{
+      const date=selectedDate(),iface=document.querySelector('#statsIface').value;
+      const query=new URLSearchParams({date});if(iface)query.set('iface',iface);
+      const [stats,events]=await Promise.all([api(`/api/stats?${query}`),api('/api/events')]);
+      const rows=stats.rows,bytes=rows.reduce((sum,row)=>sum+row.tx_bytes,0);
+      document.querySelector('#totalUpload').innerHTML=`${(bytes/1_000_000_000).toFixed(3)} <small>GB</small>`;
+      const body=document.querySelector('#stats');body.replaceChildren();
+      if(!rows.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=3;td.className='empty';td.textContent='暂无数据；服务启动后开始统计。';tr.appendChild(td);body.appendChild(tr)}
+      rows.forEach(row=>{const tr=document.createElement('tr');cell(tr,`${date} / ${row.iface}`);cell(tr,`${row.tx_gb.toFixed(3)} GB`);cell(tr,'系统网卡累计字节');body.appendChild(tr)});
+      const eventList=document.querySelector('#events');eventList.replaceChildren();
+      if(!events.length){const li=document.createElement('li');li.className='empty';li.textContent='暂无执行记录';eventList.appendChild(li)}
+      events.forEach(event=>{const li=document.createElement('li'),time=document.createElement('span'),text=document.createElement('span');time.className='event-time';time.textContent=new Date(event.created_at.replace(' ','T')+'Z').toLocaleString('zh-CN',{hour12:false});text.textContent=event.message;if(event.level==='error')text.className='event-error';li.append(time,text);eventList.appendChild(li)});
+    }catch(error){message(error.message)}
+  }
+  document.querySelector('#saveToken').addEventListener('click',()=>{sessionStorage.setItem('pveNicShaperToken',tokenInput.value.trim());message('令牌已保存在当前浏览器会话');refresh();refreshActivity()});
+  document.querySelector('#refresh').addEventListener('click',()=>{refresh();refreshActivity()});
+  document.querySelector('#toggleService').addEventListener('click',async()=>{
+    try{const result=await api('/api/settings',{method:'POST',body:JSON.stringify({enabled:!serviceEnabled})});message(result.errors?.join('\n')||'调度状态已更新');await refresh();await refreshActivity()}catch(error){message(error.message)}
+  });
+  document.querySelector('#add').addEventListener('click',async()=>{
+    const days=[...document.querySelector('#days').selectedOptions].map(option=>Number(option.value));
+    try{const result=await api('/api/rules',{method:'POST',body:JSON.stringify({iface:document.querySelector('#iface').value,direction:document.querySelector('#direction').value,rate_mbps:Number(document.querySelector('#rate').value),start_hhmm:document.querySelector('#start').value,end_hhmm:document.querySelector('#end').value,days,enabled:true})});message(result.errors?.join('\n')||'规则已保存');await refresh();await refreshActivity()}catch(error){message(error.message)}
+  });
+  document.querySelector('#statsDate').addEventListener('change',refreshActivity);
+  document.querySelector('#statsIface').addEventListener('change',refreshActivity);
+  document.querySelector('#export').addEventListener('click',async()=>{
+    try{const response=await fetch(`/api/stats.csv?date=${encodeURIComponent(selectedDate())}`,{headers:{Authorization:'Bearer '+tokenInput.value.trim()}});if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.error||`HTTP ${response.status}`)}const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`pve-nic-shaper-${selectedDate()}.csv`;link.click();URL.revokeObjectURL(url)}catch(error){message(error.message)}
+  });
+  document.querySelector('#statsDate').value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  function tick(){document.querySelector('#localTime').textContent=new Date().toLocaleString('zh-CN',{hour12:false})}
+  tick();setInterval(tick,1000);refresh();refreshActivity();setInterval(refresh,2000);setInterval(refreshActivity,30000);
 </script>
 </body>
 </html>
